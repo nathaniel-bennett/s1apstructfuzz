@@ -70,7 +70,11 @@ pub unsafe extern "C" fn s1ap_arbitrary_to_structured(buf_in: *mut c_char, in_le
     let in_slice = std::slice::from_raw_parts(buf_in as *const u8, in_len);
     let out_slice = std::slice::from_raw_parts_mut(buf_out as *mut u8, out_max);
 
-    let s1ap_message = s1ap::S1AP_PDU::from_entropy(&mut EntropySource::from_slice(in_slice));
+    let in_iter = in_slice.iter().chain(std::iter::repeat(&0u8).take(200_000 - in_slice.len())); // Cap total entropy to 200,000 bytes for performance
+
+    let Ok(s1ap_message) = s1ap::S1AP_PDU::from_finite_entropy(&mut FiniteEntropySource::from_iter(in_iter)) else {
+        return S1AP_ERR_ARBITRARY_FAIL
+    };
 
     let mut encoded = asn1_codecs::PerCodecData::new_aper();
     match s1ap_message.aper_encode(&mut encoded) {
